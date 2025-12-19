@@ -3,89 +3,368 @@
 <head>
   <meta charset="UTF-8" />
   <title>AJXT Burn Tool</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <!-- Solana Web3 -->
+  <!-- Buffer polyfill (for instruction data encoding) -->
+  <script src="https://unpkg.com/buffer@6.0.3/index.js"></script>
+
+  <!-- Solana Web3 (IIFE) -->
   <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
 
   <style>
-    body {
+    :root{
+      --bg:#0b0b0b;
+      --panel:#151515;
+      --text:#ffffff;
+      --muted:#a9a9a9;
+      --ok:#00c853;
+      --danger:#d50000;
+      --field:#f4f4f4;
+      --fieldText:#101010;
+      --btnText:#000;
+      --radius:14px;
+    }
+    body{
       font-family: Arial, sans-serif;
-      background: #0b0b0b;
-      color: #ffffff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      min-height:100vh;
+      margin:0;
+      padding:24px;
     }
-    .box {
-      background: #151515;
-      padding: 24px;
-      border-radius: 12px;
-      width: 320px;
-      text-align: center;
+    .box{
+      background: var(--panel);
+      padding: 22px;
+      border-radius: var(--radius);
+      width: min(360px, 92vw);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
     }
-    button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 12px;
+    h2{ margin: 2px 0 14px; font-size: 22px; }
+    button{
+      width:100%;
+      padding: 12px 14px;
+      margin-top: 10px;
       font-size: 16px;
-      border-radius: 8px;
+      border-radius: 10px;
       border: none;
       cursor: pointer;
+      font-weight: 700;
     }
-    .primary { background:#00c853; color:#000; }
-    .danger { background:#d50000; color:#fff; }
-    input {
-      width: 100%;
-      padding: 10px;
+    .primary{ background: var(--ok); color: var(--btnText); }
+    .danger{ background: var(--danger); color: #fff; }
+    .secondary{ background:#2a2a2a; color:#fff; }
+    input{
+      width:100%;
+      padding: 11px 12px;
       margin-top: 10px;
-      border-radius: 6px;
+      border-radius: 10px;
       border: none;
       font-size: 16px;
+      background: var(--field);
+      color: var(--fieldText);
+      box-sizing: border-box;
     }
-    .status {
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
       margin-top: 10px;
-      font-size: 14px;
-      color: #aaa;
+    }
+    .row > button{ margin-top:0; width:auto; flex:1; }
+    .status{
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .hr{
+      height:1px;
+      background: rgba(255,255,255,.08);
+      margin: 14px 0;
+      border-radius:999px;
+    }
+    .small{
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.35;
+    }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+    .badge{
+      display:inline-block;
+      padding: 4px 8px;
+      border-radius:999px;
+      background: rgba(0,200,83,.16);
+      color: #b9ffcf;
+      font-size: 12px;
+      margin-left: 8px;
+      vertical-align: middle;
     }
   </style>
 </head>
 
 <body>
   <div class="box">
-    <h2>AJXT Burn Tool</h2>
+    <h2>AJXT Burn Tool <span class="badge">SPL Burn</span></h2>
 
-    <button class="primary" onclick="connectWallet()">Connect Wallet</button>
+    <button class="primary" id="btnConnect" onclick="connectWallet()">Connect Wallet</button>
 
-    <input id="amount" type="number" placeholder="Amount to burn" />
+    <div class="status" id="walletLine">Wallet not connected</div>
+    <div class="status" id="balanceLine">AJXT balance: —</div>
 
-    <button class="danger" onclick="burn()">Burn Tokens</button>
+    <div class="hr"></div>
 
-    <div class="status" id="status">Wallet not connected</div>
+    <input id="amount" inputmode="decimal" placeholder="Amount to burn (e.g. 1.5)" />
+
+    <div class="row">
+      <button class="secondary" onclick="fillMax()">Max</button>
+      <button class="danger" id="btnBurn" onclick="burn()">Burn Tokens</button>
+    </div>
+
+    <div class="status" id="status">Ready.</div>
+
+    <div class="small">
+      <b>Warning:</b> Burn is irreversible. This tool sends a burn instruction to the SPL Token Program.
+      You confirm the transaction in Phantom.
+    </div>
   </div>
 
 <script>
-  let wallet = null;
+  // Buffer polyfill
+  window.Buffer = buffer.Buffer;
 
-  async function connectWallet() {
-    if (!window.solana || !window.solana.isPhantom) {
-      alert("Phantom wallet not found");
-      return;
-    }
-    wallet = await window.solana.connect();
-    document.getElementById("status").innerText =
-      "Connected: " + wallet.publicKey.toString();
+  const { Connection, PublicKey, Transaction, TransactionInstruction, SystemProgram } = solanaWeb3;
+
+  // === CONFIG ===
+  const RPC = "https://api.mainnet-beta.solana.com";
+  const connection = new Connection(RPC, "confirmed");
+
+  const MINT = new PublicKey("HE21tN94f1sY9PABezLsqkXJe5uXP8VA4SPrE82i");
+  const DECIMALS = 9;
+
+  const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+  const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+  const RENT_SYSVAR_ID = new PublicKey("SysvarRent111111111111111111111111111111111");
+
+  let walletPubkey = null;
+  let cachedATA = null;
+  let cachedUiBalance = 0;
+
+  const el = (id) => document.getElementById(id);
+  const setStatus = (msg) => el("status").innerText = msg;
+
+  function short(pk){
+    const s = pk.toString();
+    return s.slice(0,4) + "…" + s.slice(-4);
   }
 
-  function burn() {
-    if (!wallet) {
+  function pow10(n){
+    // safe BigInt 10^n
+    let x = 1n;
+    for(let i=0;i<n;i++) x *= 10n;
+    return x;
+  }
+
+  function parseUiToBaseUnits(uiStr, decimals){
+    // supports "1", "1.5", "0.000000001"
+    const s = (uiStr || "").trim();
+    if(!s) throw new Error("Enter amount");
+    if(!/^\d+(\.\d+)?$/.test(s)) throw new Error("Invalid number format");
+
+    const [whole, fracRaw=""] = s.split(".");
+    const frac = (fracRaw + "0".repeat(decimals)).slice(0, decimals); // pad/truncate
+    const base = BigInt(whole) * pow10(decimals) + BigInt(frac || "0");
+    if(base <= 0n) throw new Error("Amount must be > 0");
+    return base;
+  }
+
+  function baseUnitsToUi(base, decimals){
+    const b = BigInt(base);
+    const div = pow10(decimals);
+    const whole = b / div;
+    const frac = (b % div).toString().padStart(decimals, "0").replace(/0+$/, "");
+    return frac.length ? `${whole}.${frac}` : `${whole}`;
+  }
+
+  function disableBurn(disabled){
+    el("btnBurn").disabled = disabled;
+    el("btnBurn").style.opacity = disabled ? 0.6 : 1;
+    el("btnBurn").style.cursor = disabled ? "not-allowed" : "pointer";
+  }
+
+  async function connectWallet(){
+    try{
+      if(!window.solana || !window.solana.isPhantom){
+        alert("Phantom wallet not found");
+        return;
+      }
+      const resp = await window.solana.connect();
+      walletPubkey = resp.publicKey;
+
+      el("walletLine").innerHTML = `Connected: <span class="mono">${walletPubkey.toString()}</span>`;
+      el("btnConnect").innerText = "Wallet Connected";
+      el("btnConnect").disabled = true;
+      el("btnConnect").style.opacity = 0.8;
+
+      setStatus("Fetching AJXT balance…");
+      await refreshBalance();
+      setStatus("Ready.");
+    }catch(e){
+      console.error(e);
+      setStatus("Connect cancelled or failed.");
+    }
+  }
+
+  function getATA(owner, mint){
+    const [ata] = PublicKey.findProgramAddressSync(
+      [
+        owner.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        mint.toBuffer()
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    return ata;
+  }
+
+  function ixCreateATA(payer, owner, mint, ata){
+    // Associated Token Account Program: create ATA (data = empty)
+    const keys = [
+      { pubkey: payer, isSigner: true,  isWritable: true  }, // payer
+      { pubkey: ata,   isSigner: false, isWritable: true  }, // ata
+      { pubkey: owner, isSigner: false, isWritable: false }, // owner
+      { pubkey: mint,  isSigner: false, isWritable: false }, // mint
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID,        isSigner: false, isWritable: false },
+      { pubkey: RENT_SYSVAR_ID,          isSigner: false, isWritable: false },
+    ];
+    return new TransactionInstruction({
+      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+      keys,
+      data: Buffer.from([]),
+    });
+  }
+
+  function ixBurn(ata, mint, owner, amountBaseUnits){
+    // SPL Token Program burn instruction:
+    // u8 instruction = 8 (Burn)
+    // u64 amount (LE)
+    const data = Buffer.alloc(1 + 8);
+    data.writeUInt8(8, 0);
+
+    // write u64 little-endian from BigInt
+    let x = BigInt(amountBaseUnits);
+    for(let i=0;i<8;i++){
+      data[1+i] = Number(x & 0xffn);
+      x >>= 8n;
+    }
+
+    const keys = [
+      { pubkey: ata,   isSigner: false, isWritable: true  }, // source token account
+      { pubkey: mint,  isSigner: false, isWritable: true  }, // mint
+      { pubkey: owner, isSigner: true,  isWritable: false }, // owner
+    ];
+
+    return new TransactionInstruction({
+      programId: TOKEN_PROGRAM_ID,
+      keys,
+      data
+    });
+  }
+
+  async function refreshBalance(){
+    if(!walletPubkey) return;
+
+    cachedATA = getATA(walletPubkey, MINT);
+
+    const info = await connection.getParsedAccountInfo(cachedATA);
+    if(!info || !info.value){
+      cachedUiBalance = 0;
+      el("balanceLine").innerText = "AJXT balance: 0 (ATA not created yet)";
+      return;
+    }
+
+    // parsed token account
+    const parsed = info.value.data;
+    const uiAmount = parsed?.parsed?.info?.tokenAmount?.uiAmount ?? 0;
+    cachedUiBalance = Number(uiAmount) || 0;
+
+    el("balanceLine").innerText = `AJXT balance: ${cachedUiBalance}`;
+  }
+
+  function fillMax(){
+    if(!walletPubkey){
       alert("Connect wallet first");
       return;
     }
-    const amount = document.getElementById("amount").value;
-    alert("Burn requested: " + amount + " AJXT (mock)");
+    el("amount").value = String(cachedUiBalance || 0);
+  }
+
+  async function burn(){
+    try{
+      if(!walletPubkey){
+        alert("Connect wallet first");
+        return;
+      }
+
+      disableBurn(true);
+
+      const ui = el("amount").value;
+      const amountBase = parseUiToBaseUnits(ui, DECIMALS);
+
+      // sanity: compare to cached balance (UI)
+      // note: cached balance might be slightly stale, still fine; chain will enforce.
+      if(Number(ui) > (cachedUiBalance + 1e-9)){
+        // not blocking hard, but warn
+        setStatus("Warning: amount > shown balance. Transaction may fail.");
+      }else{
+        setStatus("Preparing transaction…");
+      }
+
+      const ata = cachedATA || getATA(walletPubkey, MINT);
+
+      const ixs = [];
+
+      // Create ATA if missing
+      const ataInfo = await connection.getAccountInfo(ata);
+      if(!ataInfo){
+        setStatus("Creating token account (ATA)…");
+        ixs.push(ixCreateATA(walletPubkey, walletPubkey, MINT, ata));
+      }
+
+      // Burn
+      ixs.push(ixBurn(ata, MINT, walletPubkey, amountBase));
+
+      const tx = new Transaction().add(...ixs);
+      tx.feePayer = walletPubkey;
+
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+
+      setStatus("Confirm in Phantom…");
+      const res = await window.solana.signAndSendTransaction(tx);
+
+      setStatus("Sent. Confirming…");
+      const sig = res.signature;
+
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+
+      setStatus(`Burn confirmed ✅ Signature: ${sig}`);
+      await refreshBalance();
+    }catch(e){
+      console.error(e);
+      const msg = (e && e.message) ? e.message : String(e);
+      setStatus("Failed: " + msg);
+    }finally{
+      disableBurn(false);
+    }
   }
 </script>
 
