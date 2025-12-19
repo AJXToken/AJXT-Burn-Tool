@@ -39,7 +39,7 @@
       background: var(--panel);
       padding: 22px;
       border-radius: var(--radius);
-      width: min(360px, 92vw);
+      width: min(380px, 94vw);
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
     }
     h2{ margin: 2px 0 14px; font-size: 22px; }
@@ -150,6 +150,7 @@
   const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
   const RENT_SYSVAR_ID = new PublicKey("SysvarRent111111111111111111111111111111111");
 
+  let provider = null;
   let walletPubkey = null;
   let cachedATA = null;
   let cachedUiBalance = 0;
@@ -157,37 +158,14 @@
   const el = (id) => document.getElementById(id);
   const setStatus = (msg) => el("status").innerText = msg;
 
-  function short(pk){
-    const s = pk.toString();
-    return s.slice(0,4) + "…" + s.slice(-4);
-  }
+  function getProvider() {
+    // Phantom can appear as window.solana OR window.phantom.solana depending on platform
+    const p =
+      (window.phantom && window.phantom.solana) ? window.phantom.solana :
+      (window.solana ? window.solana : null);
 
-  function pow10(n){
-    // safe BigInt 10^n
-    let x = 1n;
-    for(let i=0;i<n;i++) x *= 10n;
-    return x;
-  }
-
-  function parseUiToBaseUnits(uiStr, decimals){
-    // supports "1", "1.5", "0.000000001"
-    const s = (uiStr || "").trim();
-    if(!s) throw new Error("Enter amount");
-    if(!/^\d+(\.\d+)?$/.test(s)) throw new Error("Invalid number format");
-
-    const [whole, fracRaw=""] = s.split(".");
-    const frac = (fracRaw + "0".repeat(decimals)).slice(0, decimals); // pad/truncate
-    const base = BigInt(whole) * pow10(decimals) + BigInt(frac || "0");
-    if(base <= 0n) throw new Error("Amount must be > 0");
-    return base;
-  }
-
-  function baseUnitsToUi(base, decimals){
-    const b = BigInt(base);
-    const div = pow10(decimals);
-    const whole = b / div;
-    const frac = (b % div).toString().padStart(decimals, "0").replace(/0+$/, "");
-    return frac.length ? `${whole}.${frac}` : `${whole}`;
+    if (p && p.isPhantom) return p;
+    return null;
   }
 
   function disableBurn(disabled){
@@ -196,27 +174,74 @@
     el("btnBurn").style.cursor = disabled ? "not-allowed" : "pointer";
   }
 
-  async function connectWallet(){
-    try{
-      if(!window.solana || !window.solana.isPhantom){
-        alert("Phantom wallet not found");
+  // Keep UI in sync if Phantom fires events
+  function attachProviderEvents(p) {
+    if (!p || !p.on) return;
+
+    // Avoid double-binding in case of reload logic
+    try { p.removeAllListeners && p.removeAllListeners("connect"); } catch(e){}
+    try { p.removeAllListeners && p.removeAllListeners("disconnect"); } catch(e){}
+    try { p.removeAllListeners && p.removeAllListeners("accountChanged"); } catch(e){}
+
+    p.on("connect", async () => {
+      if (p.publicKey) {
+        walletPubkey = p.publicKey;
+        el("walletLine").innerHTML =
+          `Connected: <span class="mono">${walletPubkey.toString()}</span>`;
+        setStatus("Fetching AJXT balance…");
+        await refreshBalance();
+        setStatus("Ready.");
+      }
+    });
+
+    p.on("disconnect", () => {
+      walletPubkey = null;
+      cachedATA = null;
+      cachedUiBalance = 0;
+      el("walletLine").innerText = "Wallet not connected";
+      el("balanceLine").innerText = "AJXT balance: —";
+      el("btnConnect").disabled = false;
+      el("btnConnect").style.opacity = 1;
+      el("btnConnect").innerText = "Connect Wallet";
+      setStatus("Disconnected.");
+    });
+
+    // Some Phantom versions emit accountChanged
+    p.on("accountChanged", async (pk) => {
+      if (!pk) {
+        // treat as disconnect
+        walletPubkey = null;
+        el("walletLine").innerText = "Wallet not connected";
+        el("balanceLine").innerText = "AJXT balance: —";
+        setStatus("Account cleared.");
         return;
       }
-      const resp = await window.solana.connect();
-      walletPubkey = resp.publicKey;
-
-      el("walletLine").innerHTML = `Connected: <span class="mono">${walletPubkey.toString()}</span>`;
-      el("btnConnect").innerText = "Wallet Connected";
-      el("btnConnect").disabled = true;
-      el("btnConnect").style.opacity = 0.8;
-
-      setStatus("Fetching AJXT balance…");
+      walletPubkey = new PublicKey(pk.toString());
+      el("walletLine").innerHTML =
+        `Connected: <span class="mono">${walletPubkey.toString()}</span>`;
+      setStatus("Account changed. Refreshing balance…");
       await refreshBalance();
       setStatus("Ready.");
-    }catch(e){
-      console.error(e);
-      setStatus("Connect cancelled or failed.");
-    }
+    });
+  }
+
+  // === SOLANA helpers ===
+  function pow10(n){
+    let x = 1n;
+    for(let i=0;i<n;i++) x *= 10n;
+    return x;
+  }
+
+  function parseUiToBaseUnits(uiStr, decimals){
+    const s = (uiStr || "").trim();
+    if(!s) throw new Error("Enter amount");
+    if(!/^\d+(\.\d+)?$/.test(s)) throw new Error("Invalid number format");
+
+    const [whole, fracRaw=""] = s.split(".");
+    const frac = (fracRaw + "0".repeat(decimals)).slice(0, decimals);
+    const base = BigInt(whole) * pow10(decimals) + BigInt(frac || "0");
+    if(base <= 0n) throw new Error("Amount must be > 0");
+    return base;
   }
 
   function getATA(owner, mint){
@@ -232,12 +257,11 @@
   }
 
   function ixCreateATA(payer, owner, mint, ata){
-    // Associated Token Account Program: create ATA (data = empty)
     const keys = [
-      { pubkey: payer, isSigner: true,  isWritable: true  }, // payer
-      { pubkey: ata,   isSigner: false, isWritable: true  }, // ata
-      { pubkey: owner, isSigner: false, isWritable: false }, // owner
-      { pubkey: mint,  isSigner: false, isWritable: false }, // mint
+      { pubkey: payer, isSigner: true,  isWritable: true  },
+      { pubkey: ata,   isSigner: false, isWritable: true  },
+      { pubkey: owner, isSigner: false, isWritable: false },
+      { pubkey: mint,  isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID,        isSigner: false, isWritable: false },
       { pubkey: RENT_SYSVAR_ID,          isSigner: false, isWritable: false },
@@ -256,7 +280,6 @@
     const data = Buffer.alloc(1 + 8);
     data.writeUInt8(8, 0);
 
-    // write u64 little-endian from BigInt
     let x = BigInt(amountBaseUnits);
     for(let i=0;i<8;i++){
       data[1+i] = Number(x & 0xffn);
@@ -264,9 +287,9 @@
     }
 
     const keys = [
-      { pubkey: ata,   isSigner: false, isWritable: true  }, // source token account
-      { pubkey: mint,  isSigner: false, isWritable: true  }, // mint
-      { pubkey: owner, isSigner: true,  isWritable: false }, // owner
+      { pubkey: ata,   isSigner: false, isWritable: true  },
+      { pubkey: mint,  isSigner: false, isWritable: true  },
+      { pubkey: owner, isSigner: true,  isWritable: false },
     ];
 
     return new TransactionInstruction({
@@ -288,7 +311,6 @@
       return;
     }
 
-    // parsed token account
     const parsed = info.value.data;
     const uiAmount = parsed?.parsed?.info?.tokenAmount?.uiAmount ?? 0;
     cachedUiBalance = Number(uiAmount) || 0;
@@ -304,6 +326,50 @@
     el("amount").value = String(cachedUiBalance || 0);
   }
 
+  // === CONNECT (fixed, works across Phantom variants) ===
+  async function connectWallet(){
+    try{
+      provider = getProvider();
+
+      if(!provider){
+        setStatus("Phantom not detected.");
+        alert("Phantom wallet not found");
+        return;
+      }
+
+      attachProviderEvents(provider);
+
+      setStatus("Requesting Phantom connection…");
+
+      // Critical: do NOT rely on return value. Some Phantom versions don't return publicKey here.
+      await provider.connect({ onlyIfTrusted: false });
+
+      // After connect, publicKey should be available on provider
+      if(!provider.publicKey){
+        setStatus("Connected, but Phantom did not expose publicKey. Refresh page and try again.");
+        alert("Connected, but wallet did not return public key. Try refreshing the page.");
+        return;
+      }
+
+      walletPubkey = provider.publicKey;
+
+      el("walletLine").innerHTML =
+        `Connected: <span class="mono">${walletPubkey.toString()}</span>`;
+
+      el("btnConnect").innerText = "Wallet Connected";
+      el("btnConnect").disabled = true;
+      el("btnConnect").style.opacity = 0.8;
+
+      setStatus("Fetching AJXT balance…");
+      await refreshBalance();
+      setStatus("Ready.");
+    }catch(e){
+      console.error(e);
+      setStatus("Connect failed: " + (e?.message || e));
+    }
+  }
+
+  // === BURN ===
   async function burn(){
     try{
       if(!walletPubkey){
@@ -316,27 +382,15 @@
       const ui = el("amount").value;
       const amountBase = parseUiToBaseUnits(ui, DECIMALS);
 
-      // sanity: compare to cached balance (UI)
-      // note: cached balance might be slightly stale, still fine; chain will enforce.
-      if(Number(ui) > (cachedUiBalance + 1e-9)){
-        // not blocking hard, but warn
-        setStatus("Warning: amount > shown balance. Transaction may fail.");
-      }else{
-        setStatus("Preparing transaction…");
-      }
-
       const ata = cachedATA || getATA(walletPubkey, MINT);
-
       const ixs = [];
 
-      // Create ATA if missing
       const ataInfo = await connection.getAccountInfo(ata);
       if(!ataInfo){
         setStatus("Creating token account (ATA)…");
         ixs.push(ixCreateATA(walletPubkey, walletPubkey, MINT, ata));
       }
 
-      // Burn
       ixs.push(ixBurn(ata, MINT, walletPubkey, amountBase));
 
       const tx = new Transaction().add(...ixs);
@@ -345,12 +399,18 @@
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
 
-      setStatus("Confirm in Phantom…");
-      const res = await window.solana.signAndSendTransaction(tx);
+      if(!provider) provider = getProvider();
+      if(!provider){
+        setStatus("Phantom not detected.");
+        alert("Phantom wallet not found");
+        return;
+      }
 
-      setStatus("Sent. Confirming…");
+      setStatus("Confirm burn in Phantom…");
+      const res = await provider.signAndSendTransaction(tx);
       const sig = res.signature;
 
+      setStatus("Sent. Confirming…");
       await connection.confirmTransaction(
         { signature: sig, blockhash, lastValidBlockHeight },
         "confirmed"
@@ -358,14 +418,34 @@
 
       setStatus(`Burn confirmed ✅ Signature: ${sig}`);
       await refreshBalance();
+
     }catch(e){
       console.error(e);
-      const msg = (e && e.message) ? e.message : String(e);
-      setStatus("Failed: " + msg);
+      setStatus("Failed: " + (e?.message || e));
     }finally{
       disableBurn(false);
     }
   }
+
+  // Try to auto-detect existing connection on load
+  window.addEventListener("load", async () => {
+    provider = getProvider();
+    if(provider){
+      attachProviderEvents(provider);
+      // If already connected (trusted), provider.publicKey may exist
+      if(provider.publicKey){
+        walletPubkey = provider.publicKey;
+        el("walletLine").innerHTML =
+          `Connected: <span class="mono">${walletPubkey.toString()}</span>`;
+        el("btnConnect").innerText = "Wallet Connected";
+        el("btnConnect").disabled = true;
+        el("btnConnect").style.opacity = 0.8;
+        setStatus("Fetching AJXT balance…");
+        await refreshBalance();
+        setStatus("Ready.");
+      }
+    }
+  });
 </script>
 
 </body>
