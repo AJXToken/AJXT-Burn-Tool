@@ -110,6 +110,7 @@
     <button class="primary" id="btnConnect">Connect Wallet</button>
 
     <div class="status" id="walletLine">Wallet not connected</div>
+    <div class="status" id="mintLine">Mint: —</div>
     <div class="status" id="balanceLine">AJXT balance: —</div>
 
     <div class="hr"></div>
@@ -136,7 +137,8 @@
   const RPC = "https://api.mainnet-beta.solana.com";
   const connection = new Connection(RPC, "confirmed");
 
-  const MINT = new PublicKey("HE21tN94f1sY9PABezLsqkXJe5uXP8VA4SPrE82i");
+  // ✅ You can keep "pump" here if you want — code will normalize it safely.
+  const MINT_INPUT = "HE21tN94f1sY9PABezLsqkXJe5uXP8VA4SPrE82ipump";
   const DECIMALS = 9;
 
   const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -151,16 +153,19 @@
     btn.style.cursor = v ? "not-allowed" : "pointer";
   }
 
-  // === Provider ===
+  // Phantom provider
   function getProvider(){
     const p = (window.phantom && window.phantom.solana) ? window.phantom.solana : window.solana;
     return (p && p.isPhantom) ? p : null;
   }
 
-  let provider = null;
-  let walletPubkey = null;
-  let cachedUiBalance = 0;
-  let cachedTokenAccount = null; // token account that holds AJXT (found by query)
+  // Normalize mint: if it ends with "pump", strip it (common UI suffix),
+  // and strip any whitespace just in case.
+  function normalizeMint(s){
+    let x = (s || "").trim();
+    if (x.toLowerCase().endsWith("pump")) x = x.slice(0, -4);
+    return x;
+  }
 
   // === Amount parse ===
   function pow10(n){
@@ -173,7 +178,6 @@
     const s = (uiStr || "").trim();
     if(!s) throw new Error("Enter amount");
     if(!/^\d+(\.\d+)?$/.test(s)) throw new Error("Invalid number");
-
     const [whole, fracRaw=""] = s.split(".");
     const frac = (fracRaw + "0".repeat(decimals)).slice(0, decimals);
     const base = BigInt(whole) * pow10(decimals) + BigInt(frac || "0");
@@ -191,11 +195,29 @@
     return out;
   }
 
-  // === Find AJXT token account + balance ===
+  // === Runtime state ===
+  let provider = null;
+  let walletPubkey = null;
+  let cachedUiBalance = 0;
+  let cachedTokenAccount = null;
+
+  // === Mint init (safe) ===
+  let MINT = null;
+  try{
+    const mintClean = normalizeMint(MINT_INPUT);
+    MINT = new PublicKey(mintClean);
+    el("mintLine").innerHTML = `Mint: <span class="mono">${mintClean}</span>`;
+  }catch(e){
+    console.error(e);
+    el("mintLine").innerHTML = `Mint: <span class="mono">INVALID</span>`;
+    setStatus("Invalid mint. Fix MINT_INPUT in code.");
+    return; // stop everything if mint is invalid
+  }
+
+  // === Find token account + balance ===
   async function refreshBalance(){
     if(!walletPubkey) return;
 
-    // Ask chain: token accounts for this owner & mint
     const res = await connection.getParsedTokenAccountsByOwner(walletPubkey, { mint: MINT });
 
     if(!res || !res.value || res.value.length === 0){
@@ -205,7 +227,6 @@
       return;
     }
 
-    // pick first account (usually only one)
     const acc = res.value[0];
     cachedTokenAccount = acc.pubkey;
 
@@ -226,8 +247,6 @@
       }
 
       setStatus("Requesting connection in Phantom…");
-
-      // Explicit connect. Do NOT rely on return value.
       await provider.connect({ onlyIfTrusted: false });
 
       if(!provider.publicKey){
@@ -248,6 +267,7 @@
     }catch(e){
       console.error(e);
       setStatus("Connect failed: " + (e?.message || e));
+      alert("Connect failed: " + (e?.message || e));
     }
   }
 
@@ -276,7 +296,6 @@
 
       disable(btnBurn, true);
 
-      // Ensure we know which token account to burn from
       setStatus("Checking token account…");
       await refreshBalance();
       if(!cachedTokenAccount){
@@ -296,9 +315,9 @@
       const ix = new TransactionInstruction({
         programId: TOKEN_PROGRAM_ID,
         keys: [
-          { pubkey: cachedTokenAccount, isSigner: false, isWritable: true }, // source token account
-          { pubkey: MINT,              isSigner: false, isWritable: true }, // mint
-          { pubkey: walletPubkey,      isSigner: true,  isWritable: false },// owner
+          { pubkey: cachedTokenAccount, isSigner: false, isWritable: true },
+          { pubkey: MINT,              isSigner: false, isWritable: true },
+          { pubkey: walletPubkey,      isSigner: true,  isWritable: false },
         ],
         data
       });
@@ -327,7 +346,6 @@
   el("btnConnect").addEventListener("click", connectWallet);
   el("btnMax").addEventListener("click", fillMax);
   el("btnBurn").addEventListener("click", burn);
-
 })();
 </script>
 </body>
