@@ -1,151 +1,154 @@
 <!DOCTYPE html>
-<html lang="fi">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>AJXT Burn Tool</title>
 
-  <!-- Solana web3 (browser bundle) -->
+  <!-- Solana web3 (IIFE) -->
   <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
 
   <style>
     :root{
-      --bg:#080810;
-      --panel:#0f0f1b;
-      --stroke:#2a2a3a;
+      --bg:#070718;
+      --panel:#0b0b22;
+      --stroke:#2a2a66;
       --text:#e9ecff;
       --muted:#aab0ff;
-      --green:#22c55e;
-      --red:#ef4444;
-      --amber:#f59e0b;
-      --btn:#111827;
-      --shadow: 0 10px 30px rgba(0,0,0,.45);
-      --radius:16px;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
-      --sans: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --ok:#2bff88;
+      --hot:#ff2bd6;
+      --warn:#ffd400;
+      --bad:#ff4455;
+      --btn:#12c46b;
+      --btn2:#e04444;
+      --input:#0e0e2b;
+      --px: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      --ui: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
-    *{box-sizing:border-box}
     body{
       margin:0;
       min-height:100vh;
       display:flex;
       align-items:center;
       justify-content:center;
-      background: radial-gradient(900px 600px at 30% 20%, rgba(99,102,241,.18), transparent 60%),
-                  radial-gradient(800px 500px at 70% 70%, rgba(34,197,94,.12), transparent 55%),
+      background: radial-gradient(900px 600px at 50% 20%, rgba(0,229,255,.10), transparent 60%),
+                  radial-gradient(700px 500px at 20% 80%, rgba(255,43,214,.10), transparent 60%),
                   var(--bg);
       color:var(--text);
-      font-family:var(--sans);
-      padding:22px;
+      font-family: var(--ui);
+      padding: 18px;
     }
     .card{
       width:min(520px, 100%);
-      background: rgba(15,15,27,.92);
-      border:1px solid rgba(255,255,255,.06);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border: 1px solid rgba(170,176,255,.18);
+      box-shadow: 0 18px 60px rgba(0,0,0,.55);
+      border-radius: 18px;
+      padding: 18px 18px 16px;
+      position:relative;
+      overflow:hidden;
     }
     .top{
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:12px;
-      margin-bottom:10px;
+      margin-bottom: 10px;
     }
     h1{
+      font-size: 22px;
       margin:0;
-      font-size:20px;
       letter-spacing:.2px;
     }
-    .badge{
-      font-size:12px;
-      font-weight:600;
-      padding:6px 10px;
-      border-radius:999px;
-      background: rgba(34,197,94,.12);
-      border:1px solid rgba(34,197,94,.25);
-      color:#b6ffd1;
+    .tag{
+      font-size: 12px;
+      padding: 5px 10px;
+      border: 1px solid rgba(170,176,255,.25);
+      border-radius: 999px;
+      color: var(--muted);
+      font-family: var(--px);
+    }
+    .btn{
+      width:100%;
+      border:0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-weight: 700;
+      font-size: 15px;
+      cursor:pointer;
+      transition: transform .06s ease, opacity .2s ease;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn-green{ background: linear-gradient(90deg, rgba(18,196,107,1), rgba(43,255,136,1)); color:#07110b; }
+    .btn-red{ background: linear-gradient(90deg, rgba(224,68,68,1), rgba(255,68,85,1)); color:#120707; }
+    .btn-ghost{
+      background: rgba(170,176,255,.10);
+      border: 1px solid rgba(170,176,255,.22);
+      color: var(--text);
     }
     .row{
       display:flex;
       gap:10px;
-      margin-top:12px;
-      flex-wrap:wrap;
+      align-items:center;
     }
-    .btn{
-      appearance:none;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(17,24,39,.65);
+    .meta{
+      margin: 10px 0 12px;
+      font-family: var(--px);
+      font-size: 12px;
+      color: var(--muted);
+      line-height:1.35;
+    }
+    .meta strong{ color: var(--text); font-weight:700; }
+    .kv{ display:flex; justify-content:space-between; gap:12px; }
+    .kv span{ color: var(--muted); }
+    .kv code{
+      font-family: var(--px);
       color: var(--text);
-      padding: 12px 14px;
-      border-radius: 12px;
-      cursor:pointer;
-      font-weight:700;
-      transition: transform .05s ease, border-color .15s ease, background .15s ease;
-      user-select:none;
-    }
-    .btn:active{ transform: translateY(1px); }
-    .btn.green{
-      background: linear-gradient(180deg, rgba(34,197,94,.95), rgba(16,185,129,.85));
-      border-color: rgba(34,197,94,.35);
-      color:#05210f;
-    }
-    .btn.red{
-      background: linear-gradient(180deg, rgba(239,68,68,.95), rgba(220,38,38,.85));
-      border-color: rgba(239,68,68,.35);
-      color:#2a0505;
-    }
-    .btn:disabled{
-      opacity:.55;
-      cursor:not-allowed;
-    }
-    .field{
-      width:100%;
-      margin-top:12px;
-    }
-    label{
-      display:block;
-      font-size:12px;
-      color: rgba(233,236,255,.78);
-      margin-bottom:6px;
+      word-break: break-all;
     }
     input{
       width:100%;
-      padding:12px 12px;
       border-radius: 12px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(170,176,255,.22);
+      background: rgba(14,14,43,.65);
       color: var(--text);
-      outline:none;
-      font-family: var(--mono);
+      padding: 12px 12px;
+      font-size: 15px;
+      outline: none;
     }
-    input::placeholder{ color: rgba(233,236,255,.35); }
-    .meta{
-      margin-top:10px;
-      padding:10px 12px;
+    input:focus{ border-color: rgba(0,229,255,.55); box-shadow: 0 0 0 3px rgba(0,229,255,.12); }
+    .small{
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.35;
+    }
+    .status{
+      margin-top: 10px;
+      font-family: var(--px);
+      font-size: 12px;
+      padding: 10px 10px;
       border-radius: 12px;
-      border:1px solid rgba(255,255,255,.08);
-      background: rgba(0,0,0,.18);
-      font-family: var(--mono);
-      font-size:12px;
-      line-height:1.45;
-      color: rgba(233,236,255,.86);
+      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(170,176,255,.14);
+      color: var(--muted);
+      min-height: 38px;
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .warn{
-      margin-top:12px;
-      font-size:12px;
-      color: rgba(233,236,255,.65);
+    .ok{ color: var(--ok); }
+    .bad{ color: var(--bad); }
+    .warn{ color: var(--warn); }
+    .hr{
+      height:1px;
+      background: rgba(170,176,255,.14);
+      margin: 12px 0;
     }
-    .warn strong{ color: #ffe1a8; }
-    .tiny{
-      font-size:11px;
-      color: rgba(233,236,255,.55);
-      margin-top:10px;
+    .hint{
+      font-size: 12px;
+      color: rgba(233,236,255,.75);
     }
-    .hr{height:1px;background:rgba(255,255,255,.06);margin:12px 0;}
+    .hint code{ font-family: var(--px); color: var(--text); }
   </style>
 </head>
 
@@ -153,271 +156,299 @@
   <div class="card">
     <div class="top">
       <h1>AJXT Burn Tool</h1>
-      <span class="badge">SPL Burn (Tokenkeg)</span>
+      <div class="tag">SPL Burn</div>
     </div>
 
-    <div class="meta" id="status">Ready.</div>
+    <button id="btnConnect" class="btn btn-green">Connect Wallet</button>
+
+    <div class="meta">
+      <div class="kv"><span>Wallet</span><code id="walletLine">not connected</code></div>
+      <div class="kv"><span>Mint</span><code id="mintLine">—</code></div>
+      <div class="kv"><span>Decimals</span><code id="decLine">—</code></div>
+      <div class="kv"><span>AJXT balance</span><code id="balLine">—</code></div>
+    </div>
 
     <div class="row">
-      <button class="btn green" id="btnConnect">Connect Wallet</button>
-      <button class="btn" id="btnRefresh" disabled>Refresh Balance</button>
+      <input id="amount" inputmode="decimal" placeholder="Amount to burn (e.g. 1.5)" />
     </div>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="btnMax" class="btn btn-ghost" style="width: 40%;">Max</button>
+      <button id="btnBurn" class="btn btn-red" style="width: 60%;">Burn Tokens</button>
+    </div>
+
+    <div class="status" id="status">Ready.</div>
 
     <div class="hr"></div>
-
-    <div class="field">
-      <label>Token Mint (copy from Solscan “Token address”)</label>
-      <input id="mint" placeholder="Paste token address here (may end with pump)" />
-      <div class="tiny">
-        Note: if your token address ends with <b>pump</b>, this tool will try to resolve the real mint on-chain automatically.
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Amount to burn</label>
-      <input id="amount" placeholder="e.g. 1.5" inputmode="decimal" />
-    </div>
-
-    <div class="row">
-      <button class="btn" id="btnMax" disabled>Max</button>
-      <button class="btn red" id="btnBurn" disabled>Burn Tokens</button>
-    </div>
-
-    <div class="warn">
-      <strong>Warning:</strong> Burn is irreversible. You will confirm the transaction in Phantom.
-    </div>
-
-    <div class="tiny">
-      If Phantom doesn’t connect on mobile: open this page inside Phantom’s built-in browser.
+    <div class="small">
+      <span class="warn"><strong>Warning:</strong> Burn is irreversible.</span>
+      This sends a burn instruction to the SPL Token Program.
+      You will confirm the transaction in Phantom.
+      <br/><br/>
+      <span class="hint">
+        Mobile: this works best in <strong>Phantom in-app browser</strong> (open the URL inside Phantom).
+      </span>
     </div>
   </div>
 
 <script>
 (() => {
-  const { Connection, PublicKey, Transaction } = solanaWeb3;
+  const { Connection, PublicKey, Transaction, TransactionInstruction } = solanaWeb3;
 
-  // ====== CONFIG ======
-  const RPC = "https://api.mainnet-beta.solana.com";
+  // ✅ Use an RPC that doesn't 403 your GitHub Pages origin
+  const RPC = "https://rpc.ankr.com/solana";
+
+  // ✅ Your mint (WITH pump suffix is fine if it's real base58)
+  const MINT_STR = "HE21tN94f1sY9PABezLsqkXJe5uXP8VA4SPrE82ipump";
+
+  // SPL Token Program (Tokenkeg...)
   const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-  const ASSOC_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+  // Associated Token Account Program
+  const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
   const SYSTEM_PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
-  // ====================
-
-  const el = (id) => document.getElementById(id);
-
-  const statusEl = el("status");
-  const btnConnect = el("btnConnect");
-  const btnRefresh = el("btnRefresh");
-  const btnMax = el("btnMax");
-  const btnBurn = el("btnBurn");
-  const mintInput = el("mint");
-  const amountInput = el("amount");
+  const RENT_SYSVAR_ID = new PublicKey("SysvarRent111111111111111111111111111111111");
 
   const conn = new Connection(RPC, "confirmed");
 
+  // UI
+  const btnConnect = document.getElementById("btnConnect");
+  const btnBurn = document.getElementById("btnBurn");
+  const btnMax = document.getElementById("btnMax");
+  const amountEl = document.getElementById("amount");
+
+  const walletLine = document.getElementById("walletLine");
+  const mintLine = document.getElementById("mintLine");
+  const decLine = document.getElementById("decLine");
+  const balLine = document.getElementById("balLine");
+  const statusEl = document.getElementById("status");
+
+  // State
   let provider = null;
   let walletPubkey = null;
+  let mintPk = null;
+  let decimals = null;
+  let ataPk = null;
+  let rawBalance = 0n;
 
-  function setStatus(msg){ statusEl.textContent = msg; }
-
-  function hasPhantom() {
-    return !!(window?.solana && window.solana.isPhantom);
+  function setStatus(msg, cls="") {
+    statusEl.className = "status";
+    if (cls) statusEl.classList.add(cls);
+    statusEl.textContent = msg;
   }
 
-  async function connectWallet(){
-    if (!hasPhantom()){
-      setStatus("Phantom not found. Install Phantom, or open this page inside Phantom browser (mobile).");
-      return;
-    }
-    provider = window.solana;
-    try{
-      const res = await provider.connect();
-      walletPubkey = res.publicKey;
-      setStatus("Connected: " + walletPubkey.toBase58());
-      btnRefresh.disabled = false;
-      btnMax.disabled = false;
-      btnBurn.disabled = false;
-      await refreshBalance(); // auto
-    }catch(e){
-      setStatus("Connect canceled or failed: " + (e?.message || e));
-    }
+  function short(pk) {
+    const s = pk.toString();
+    return s.slice(0,4) + "…" + s.slice(-4);
   }
 
-  // --- base58-ish filter: we allow "pump" in UI input, but must resolve to real mint ---
-  function looksLikePumpSuffix(s){
-    return typeof s === "string" && s.endsWith("pump");
-  }
-
-  // Resolve "token address" that ends with pump -> real mint public key
-  // Strategy:
-  // - Try to parse as PublicKey; if fails and endsWith pump -> fetch Solscan token page JSON via their public endpoint is blocked by CORS.
-  // - So we do on-chain resolution by scanning token accounts owned by wallet and matching *display* address fails.
-  // Better approach: require user paste the REAL mint from Solscan "Mint Address" if available.
-  // However user only sees "token address" with pump; we implement a safe fallback:
-  // - If input is invalid pubkey, we STOP and instruct to copy the "Mint Address" field (not token address).
-  async function getMintPubkey(){
-    const raw = (mintInput.value || "").trim();
-    if (!raw) throw new Error("Paste token mint first.");
-
-    try {
-      return new PublicKey(raw); // if it's valid, done
-    } catch(_) {
-      // If invalid, we give a clear instruction rather than guessing.
-      // Because guessing a mint is dangerous.
-      if (looksLikePumpSuffix(raw)){
-        throw new Error(
-          "That value ends with 'pump' and is not a valid Solana public key for web3.js.\n" +
-          "On Solscan, copy the field named 'Mint Address' (NOT the shortened token address with pump)."
-        );
-      }
-      throw new Error("Invalid mint / address. Copy 'Mint Address' from Solscan.");
-    }
-  }
-
-  // Get associated token address (ATA) instruction derivation (no external libs)
-  async function findAssociatedTokenAddress(owner, mint){
-    const [ata] = await PublicKey.findProgramAddress(
-      [
-        owner.toBuffer(),
-        TOKEN_PROGRAM_ID.toBuffer(),
-        mint.toBuffer()
-      ],
-      ASSOC_TOKEN_PROGRAM_ID
-    );
-    return ata;
-  }
-
-  async function getTokenAccountBalance(owner, mint){
-    const ata = await findAssociatedTokenAddress(owner, mint);
-    const info = await conn.getTokenAccountBalance(ata).catch(() => null);
-    if (!info) return { ata, uiAmount: 0, decimals: null };
-    return { ata, uiAmount: info.value.uiAmount || 0, decimals: info.value.decimals };
-  }
-
-  // SPL Token "Burn" instruction (instruction 8)
-  function makeBurnIx({ ata, mint, owner, amountRaw }){
-    // data layout: u8 instruction (8) + u64 amount (LE)
-    const data = new Uint8Array(1 + 8);
-    data[0] = 8;
-
-    // write u64 little endian
-    let x = BigInt(amountRaw);
-    for (let i = 0; i < 8; i++){
-      data[1 + i] = Number(x & 0xffn);
+  function u64ToLeBytes(xBig) {
+    // xBig: BigInt
+    const out = new Uint8Array(8);
+    let x = xBig;
+    for (let i=0; i<8; i++) {
+      out[i] = Number(x & 0xffn);
       x >>= 8n;
     }
+    return out;
+  }
 
-    return new solanaWeb3.TransactionInstruction({
+  async function findATA(ownerPk, mintPk) {
+    const [pda] = await PublicKey.findProgramAddress(
+      [
+        ownerPk.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        mintPk.toBuffer()
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    return pda;
+  }
+
+  async function loadMintInfo() {
+    mintPk = new PublicKey(MINT_STR.trim());
+    mintLine.textContent = mintPk.toString();
+
+    const info = await conn.getAccountInfo(mintPk, "confirmed");
+    if (!info || !info.data || info.data.length < 45) {
+      throw new Error("Mint account not found / invalid data.");
+    }
+
+    // SPL Mint layout decimals at byte offset 44
+    const data = info.data;
+    decimals = data[44];
+    decLine.textContent = String(decimals);
+  }
+
+  async function loadBalance() {
+    if (!walletPubkey || !mintPk) return;
+
+    ataPk = await findATA(walletPubkey, mintPk);
+
+    const ataInfo = await conn.getAccountInfo(ataPk, "confirmed");
+    if (!ataInfo) {
+      rawBalance = 0n;
+      balLine.textContent = "0";
+      return;
+    }
+    const data = ataInfo.data;
+    // SPL Token Account amount at offset 64..72 (u64 LE)
+    if (data.length < 72) throw new Error("Token account data too short.");
+    let amt = 0n;
+    for (let i=0; i<8; i++) amt |= BigInt(data[64+i]) << (8n*BigInt(i));
+    rawBalance = amt;
+
+    // Display as decimal string
+    const div = 10n ** BigInt(decimals);
+    const whole = rawBalance / div;
+    const frac = rawBalance % div;
+
+    // format fractional trimmed
+    let fracStr = frac.toString().padStart(decimals, "0");
+    fracStr = fracStr.replace(/0+$/, "");
+    balLine.textContent = fracStr ? `${whole}.${fracStr}` : `${whole}`;
+  }
+
+  function getProvider() {
+    // Phantom injects window.solana in desktop extension and mobile in-app browser
+    if (window.solana && window.solana.isPhantom) return window.solana;
+    return null;
+  }
+
+  async function connectWallet() {
+    provider = getProvider();
+    if (!provider) {
+      setStatus("Phantom wallet not found.\n\nDesktop: install Phantom extension.\nMobile: open this page inside Phantom in-app browser.", "bad");
+      return;
+    }
+
+    setStatus("Connecting wallet…");
+    const res = await provider.connect();
+    walletPubkey = res.publicKey;
+
+    walletLine.textContent = walletPubkey.toString();
+    btnConnect.textContent = "Wallet Connected";
+    btnConnect.disabled = true;
+    btnConnect.style.opacity = "0.9";
+
+    // Load mint + balance
+    await loadMintInfo();
+    await loadBalance();
+
+    setStatus(`Connected: ${short(walletPubkey)}\nATA: ${ataPk ? short(ataPk) : "—"}\nBalance loaded.`, "ok");
+  }
+
+  function parseAmountToRaw(inputStr) {
+    if (decimals === null) throw new Error("Decimals not loaded yet.");
+    const s = (inputStr || "").trim().replace(",", ".");
+    if (!s) throw new Error("Enter an amount.");
+
+    // Only digits + dot
+    if (!/^\d+(\.\d+)?$/.test(s)) throw new Error("Invalid number format.");
+
+    const [a, b=""] = s.split(".");
+    const frac = b.slice(0, decimals).padEnd(decimals, "0"); // cut & pad
+    const rawStr = a + frac;
+    // Remove leading zeros safely
+    const raw = BigInt(rawStr.replace(/^0+(?=\d)/, ""));
+    return raw;
+  }
+
+  function buildBurnIx(tokenAccount, mint, owner, rawAmount) {
+    // SPL Token burn instruction = 8
+    // data = [u8 instruction=8] + [u64 amount LE]
+    const data = new Uint8Array(1 + 8);
+    data[0] = 8;
+    data.set(u64ToLeBytes(rawAmount), 1);
+
+    return new TransactionInstruction({
       programId: TOKEN_PROGRAM_ID,
       keys: [
-        { pubkey: ata,  isSigner: false, isWritable: true },
-        { pubkey: mint, isSigner: false, isWritable: true },
-        { pubkey: owner, isSigner: true,  isWritable: false }
+        { pubkey: tokenAccount, isSigner: false, isWritable: true },
+        { pubkey: mint,         isSigner: false, isWritable: true },
+        { pubkey: owner,        isSigner: true,  isWritable: false },
       ],
       data
     });
   }
 
-  let cachedBalance = { uiAmount: 0, decimals: 0, ata: null, mint: null };
+  async function burn() {
+    try {
+      provider = getProvider();
+      if (!provider || !walletPubkey) {
+        setStatus("Wallet not connected.", "bad");
+        return;
+      }
+      if (!mintPk || decimals === null) {
+        await loadMintInfo();
+      }
+      await loadBalance();
 
-  async function refreshBalance(){
-    if (!walletPubkey) return;
-    try{
-      const mint = await getMintPubkey();
-      const bal = await getTokenAccountBalance(walletPubkey, mint);
+      const rawAmt = parseAmountToRaw(amountEl.value);
+      if (rawAmt <= 0n) throw new Error("Amount must be > 0.");
+      if (rawAmt > rawBalance) throw new Error("Not enough AJXT balance.");
 
-      cachedBalance = { ...bal, mint };
-      const dec = (bal.decimals ?? "(unknown)");
-      setStatus(
-        "Wallet: " + walletPubkey.toBase58() + "\n" +
-        "Mint: " + mint.toBase58() + "\n" +
-        "ATA: " + bal.ata.toBase58() + "\n" +
-        "Balance: " + bal.uiAmount + " (decimals: " + dec + ")"
-      );
-    }catch(e){
-      setStatus("Balance check failed: " + (e?.message || e));
-    }
-  }
+      setStatus("Building transaction…");
 
-  function toRawAmount(uiStr, decimals){
-    // uiStr like "1.5" -> raw integer string
-    if (decimals == null) throw new Error("Decimals unknown. Click Refresh Balance first.");
-    const s = (uiStr || "").trim();
-    if (!s) throw new Error("Enter amount.");
-    if (!/^\d+(\.\d+)?$/.test(s)) throw new Error("Invalid amount format.");
+      if (!ataPk) ataPk = await findATA(walletPubkey, mintPk);
 
-    const [a, b=""] = s.split(".");
-    const frac = (b + "0".repeat(decimals)).slice(0, decimals);
-    const raw = BigInt(a) * (10n ** BigInt(decimals)) + BigInt(frac || "0");
-    return raw;
-  }
+      const ix = buildBurnIx(ataPk, mintPk, walletPubkey, rawAmt);
 
-  async function setMax(){
-    await refreshBalance();
-    if (cachedBalance.decimals == null){
-      setStatus("Cannot set Max: decimals unknown. Try Refresh Balance again.");
-      return;
-    }
-    amountInput.value = String(cachedBalance.uiAmount || 0);
-  }
-
-  async function burn(){
-    if (!provider || !walletPubkey){
-      setStatus("Connect wallet first.");
-      return;
-    }
-
-    try{
-      // Ensure we have fresh balance + decimals + ata
-      await refreshBalance();
-      const mint = cachedBalance.mint;
-      const ata = cachedBalance.ata;
-      const decimals = cachedBalance.decimals;
-
-      if (!mint || !ata) throw new Error("Token account not found. Do you hold this token in this wallet?");
-      if (decimals == null) throw new Error("Decimals unknown. Click Refresh Balance first.");
-
-      const raw = toRawAmount(amountInput.value, decimals);
-      if (raw <= 0n) throw new Error("Amount must be > 0.");
-
-      // Build tx
-      const tx = new Transaction();
-      tx.add(makeBurnIx({ ata, mint, owner: walletPubkey, amountRaw: raw.toString() }));
-
+      const tx = new Transaction().add(ix);
       tx.feePayer = walletPubkey;
-      const latest = await conn.getLatestBlockhash("finalized");
-      tx.recentBlockhash = latest.blockhash;
 
-      setStatus("Waiting for Phantom signature...");
+      const { blockhash } = await conn.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+
+      setStatus("Requesting signature in Phantom…");
+
+      // Phantom supports signTransaction (safe) + we send ourselves
       const signed = await provider.signTransaction(tx);
-
-      setStatus("Sending transaction...");
       const sig = await conn.sendRawTransaction(signed.serialize(), { skipPreflight: false });
 
-      setStatus("Confirming...\n" + sig);
-      await conn.confirmTransaction({ signature: sig, ...latest }, "confirmed");
+      setStatus(`Sent. Waiting confirmation…\nSignature: ${sig}`);
 
-      setStatus("✅ Burn confirmed.\nTx: " + sig);
-      await refreshBalance();
-    }catch(e){
-      setStatus("Burn failed: " + (e?.message || e));
+      const conf = await conn.confirmTransaction(sig, "confirmed");
+      if (conf.value && conf.value.err) {
+        throw new Error("Transaction failed: " + JSON.stringify(conf.value.err));
+      }
+
+      await loadBalance();
+      setStatus(`✅ Burn confirmed.\nSignature: ${sig}\nNew balance: ${balLine.textContent}`, "ok");
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      setStatus("❌ " + msg, "bad");
+      console.error(e);
     }
   }
 
-  // UI hooks
-  btnConnect.addEventListener("click", connectWallet);
-  btnRefresh.addEventListener("click", refreshBalance);
-  btnMax.addEventListener("click", setMax);
-  btnBurn.addEventListener("click", burn);
+  btnConnect.addEventListener("click", () => connectWallet());
+  btnBurn.addEventListener("click", () => burn());
 
-  // auto hint
-  if (!hasPhantom()){
-    setStatus("Ready. Phantom not detected in this browser. On mobile: open inside Phantom browser.");
-  } else {
-    setStatus("Ready. Click Connect Wallet.");
-  }
+  btnMax.addEventListener("click", async () => {
+    try {
+      if (!walletPubkey) { setStatus("Connect wallet first.", "bad"); return; }
+      if (!mintPk || decimals === null) await loadMintInfo();
+      await loadBalance();
+
+      const div = 10n ** BigInt(decimals);
+      const whole = rawBalance / div;
+      const frac = rawBalance % div;
+
+      let fracStr = frac.toString().padStart(decimals, "0");
+      fracStr = fracStr.replace(/0+$/, "");
+      amountEl.value = fracStr ? `${whole}.${fracStr}` : `${whole}`;
+      setStatus("Max filled.", "ok");
+    } catch (e) {
+      setStatus("❌ " + (e?.message || String(e)), "bad");
+    }
+  });
+
+  // Pre-fill mint line quickly (even before network)
+  try {
+    mintLine.textContent = MINT_STR;
+  } catch {}
+
 })();
 </script>
-
 </body>
 </html>
