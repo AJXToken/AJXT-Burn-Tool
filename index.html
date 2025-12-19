@@ -4,105 +4,23 @@
   <meta charset="utf-8" />
   <title>AJXT Burn Tool</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Solana Web3 (browser IIFE) -->
   <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-
   <style>
-    :root{
-      --bg:#0b0b0b;
-      --panel:#151515;
-      --text:#ffffff;
-      --muted:#a9a9a9;
-      --ok:#00c853;
-      --danger:#d50000;
-      --field:#f4f4f4;
-      --fieldText:#101010;
-      --radius:14px;
-    }
-    body{
-      font-family: Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      min-height:100vh;
-      margin:0;
-      padding:24px;
-    }
-    .box{
-      background: var(--panel);
-      padding: 22px;
-      border-radius: var(--radius);
-      width: min(420px, 96vw);
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
-    }
-    h2{ margin: 2px 0 14px; font-size: 22px; }
-    .badge{
-      display:inline-block;
-      padding: 4px 8px;
-      border-radius:999px;
-      background: rgba(0,200,83,.16);
-      color: #b9ffcf;
-      font-size: 12px;
-      margin-left: 8px;
-      vertical-align: middle;
-    }
-    button{
-      width:100%;
-      padding: 12px 14px;
-      margin-top: 10px;
-      font-size: 16px;
-      border-radius: 10px;
-      border: none;
-      cursor: pointer;
-      font-weight: 700;
-    }
-    .primary{ background: var(--ok); color: #000; }
-    .danger{ background: var(--danger); color: #fff; }
-    .secondary{ background:#2a2a2a; color:#fff; }
-    input{
-      width:100%;
-      padding: 11px 12px;
-      margin-top: 10px;
-      border-radius: 10px;
-      border: none;
-      font-size: 16px;
-      background: var(--field);
-      color: var(--fieldText);
-      box-sizing: border-box;
-    }
-    .row{
-      display:flex;
-      gap:10px;
-      align-items:center;
-      margin-top: 10px;
-    }
-    .row > button{ margin-top:0; width:auto; flex:1; }
-    .status{
-      margin-top: 10px;
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.35;
-      word-break: break-word;
-    }
-    .hr{
-      height:1px;
-      background: rgba(255,255,255,.08);
-      margin: 14px 0;
-      border-radius:999px;
-    }
-    .small{
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 10px;
-      line-height: 1.35;
-    }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+    :root{--bg:#0b0b0b;--panel:#151515;--text:#fff;--muted:#a9a9a9;--ok:#00c853;--danger:#d50000;--field:#f4f4f4;--fieldText:#101010}
+    body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:24px}
+    .box{background:var(--panel);padding:22px;border-radius:14px;width:min(420px,96vw);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    h2{margin:2px 0 14px;font-size:22px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:rgba(0,200,83,.16);color:#b9ffcf;font-size:12px;margin-left:8px;vertical-align:middle}
+    button{width:100%;padding:12px 14px;margin-top:10px;font-size:16px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
+    .primary{background:var(--ok);color:#000}.danger{background:var(--danger);color:#fff}.secondary{background:#2a2a2a;color:#fff}
+    input{width:100%;padding:11px 12px;margin-top:10px;border-radius:10px;border:none;font-size:16px;background:var(--field);color:var(--fieldText);box-sizing:border-box}
+    .row{display:flex;gap:10px;align-items:center;margin-top:10px}.row>button{margin-top:0;width:auto;flex:1}
+    .status{margin-top:10px;font-size:13px;color:var(--muted);line-height:1.35;word-break:break-word}
+    .hr{height:1px;background:rgba(255,255,255,.08);margin:14px 0;border-radius:999px}
+    .small{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.35}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
   </style>
 </head>
-
 <body>
   <div class="box">
     <h2>AJXT Burn Tool <span class="badge">SPL Burn</span></h2>
@@ -110,7 +28,6 @@
     <button class="primary" id="btnConnect">Connect Wallet</button>
 
     <div class="status" id="walletLine">Wallet not connected</div>
-    <div class="status" id="mintLine">Mint: —</div>
     <div class="status" id="balanceLine">AJXT balance: —</div>
 
     <div class="hr"></div>
@@ -133,17 +50,32 @@
 (() => {
   const { Connection, PublicKey, Transaction, TransactionInstruction } = solanaWeb3;
 
-  // === CONFIG ===
   const RPC = "https://api.mainnet-beta.solana.com";
   const connection = new Connection(RPC, "confirmed");
 
-  // ✅ You can keep "pump" here if you want — code will normalize it safely.
-  const MINT_INPUT = "HE21tN94f1sY9PABezLsqkXJe5uXP8VA4SPrE82ipump";
-  const DECIMALS = 9;
+  // ✅ YOUR MINT (keep the pump part if that's the real mint)
+  const MINT_STR_RAW = "HE21tN94f1sY9PABezLsqkXJe5uXP8VA4SPrE82ipump";
+  const MINT_STR = (MINT_STR_RAW || "").trim();
 
+  let MINT = null;
+  try {
+    MINT = new PublicKey(MINT_STR);
+  } catch (e) {
+    // If Phantom copy included invisible chars, show it clearly instead of crashing the whole app
+    const msg =
+      "INVALID MINT STRING. This page can't run until mint is valid.\n" +
+      "Mint (trimmed): [" + MINT_STR + "]\n" +
+      "Length: " + MINT_STR.length + "\n" +
+      "Tip: copy Mint Address from Solscan token page.\n" +
+      "Error: " + (e?.message || e);
+    document.getElementById("status").innerText = msg;
+    console.error(msg);
+    return;
+  }
+
+  const DECIMALS = 9;
   const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
-  // === UI helpers ===
   const el = (id) => document.getElementById(id);
   const setStatus = (msg) => el("status").innerText = msg;
 
@@ -153,26 +85,17 @@
     btn.style.cursor = v ? "not-allowed" : "pointer";
   }
 
-  // Phantom provider
   function getProvider(){
     const p = (window.phantom && window.phantom.solana) ? window.phantom.solana : window.solana;
     return (p && p.isPhantom) ? p : null;
   }
 
-  // Normalize mint: if it ends with "pump", strip it (common UI suffix),
-  // and strip any whitespace just in case.
-  function normalizeMint(s){
-    let x = (s || "").trim();
-    if (x.toLowerCase().endsWith("pump")) x = x.slice(0, -4);
-    return x;
-  }
+  let provider = null;
+  let walletPubkey = null;
+  let cachedUiBalance = 0;
+  let cachedTokenAccount = null;
 
-  // === Amount parse ===
-  function pow10(n){
-    let x = 1n;
-    for(let i=0;i<n;i++) x *= 10n;
-    return x;
-  }
+  function pow10(n){ let x=1n; for(let i=0;i<n;i++) x*=10n; return x; }
 
   function parseUiToBaseUnits(uiStr, decimals){
     const s = (uiStr || "").trim();
@@ -188,55 +111,25 @@
   function u64LE(nBig){
     let x = BigInt(nBig);
     const out = new Uint8Array(8);
-    for(let i=0;i<8;i++){
-      out[i] = Number(x & 0xffn);
-      x >>= 8n;
-    }
+    for(let i=0;i<8;i++){ out[i]=Number(x & 0xffn); x >>= 8n; }
     return out;
   }
 
-  // === Runtime state ===
-  let provider = null;
-  let walletPubkey = null;
-  let cachedUiBalance = 0;
-  let cachedTokenAccount = null;
-
-  // === Mint init (safe) ===
-  let MINT = null;
-  try{
-    const mintClean = normalizeMint(MINT_INPUT);
-    MINT = new PublicKey(mintClean);
-    el("mintLine").innerHTML = `Mint: <span class="mono">${mintClean}</span>`;
-  }catch(e){
-    console.error(e);
-    el("mintLine").innerHTML = `Mint: <span class="mono">INVALID</span>`;
-    setStatus("Invalid mint. Fix MINT_INPUT in code.");
-    return; // stop everything if mint is invalid
-  }
-
-  // === Find token account + balance ===
   async function refreshBalance(){
     if(!walletPubkey) return;
-
     const res = await connection.getParsedTokenAccountsByOwner(walletPubkey, { mint: MINT });
-
-    if(!res || !res.value || res.value.length === 0){
-      cachedUiBalance = 0;
-      cachedTokenAccount = null;
+    if(!res?.value?.length){
+      cachedUiBalance = 0; cachedTokenAccount = null;
       el("balanceLine").innerText = "AJXT balance: 0 (no token account found)";
       return;
     }
-
     const acc = res.value[0];
     cachedTokenAccount = acc.pubkey;
-
     const ui = acc.account.data.parsed.info.tokenAmount.uiAmount ?? 0;
     cachedUiBalance = Number(ui) || 0;
-
     el("balanceLine").innerText = `AJXT balance: ${cachedUiBalance}`;
   }
 
-  // === Connect ===
   async function connectWallet(){
     try{
       provider = getProvider();
@@ -245,18 +138,15 @@
         setStatus("Phantom not detected.");
         return;
       }
-
       setStatus("Requesting connection in Phantom…");
       await provider.connect({ onlyIfTrusted: false });
 
       if(!provider.publicKey){
         setStatus("Connected but no publicKey. Refresh and try again.");
-        alert("Connected but no public key returned. Refresh page and try again.");
         return;
       }
 
       walletPubkey = provider.publicKey;
-
       el("walletLine").innerHTML = `Connected: <span class="mono">${walletPubkey.toString()}</span>`;
       el("btnConnect").innerText = "Wallet Connected";
       disable(el("btnConnect"), true);
@@ -267,35 +157,22 @@
     }catch(e){
       console.error(e);
       setStatus("Connect failed: " + (e?.message || e));
-      alert("Connect failed: " + (e?.message || e));
     }
   }
 
-  // === Max ===
   function fillMax(){
-    if(!walletPubkey){
-      alert("Connect wallet first");
-      return;
-    }
+    if(!walletPubkey){ alert("Connect wallet first"); return; }
     el("amount").value = String(cachedUiBalance || 0);
   }
 
-  // === Burn ===
   async function burn(){
     const btnBurn = el("btnBurn");
     try{
-      if(!walletPubkey){
-        alert("Connect wallet first");
-        return;
-      }
+      if(!walletPubkey){ alert("Connect wallet first"); return; }
       if(!provider) provider = getProvider();
-      if(!provider){
-        alert("Phantom not detected");
-        return;
-      }
+      if(!provider){ alert("Phantom not detected"); return; }
 
       disable(btnBurn, true);
-
       setStatus("Checking token account…");
       await refreshBalance();
       if(!cachedTokenAccount){
@@ -306,10 +183,8 @@
 
       const amountBase = parseUiToBaseUnits(el("amount").value, DECIMALS);
 
-      // SPL Token Program burn instruction:
-      // data = [8 (Burn), amount u64 LE]
       const data = new Uint8Array(1 + 8);
-      data[0] = 8;
+      data[0] = 8; // Burn
       data.set(u64LE(amountBase), 1);
 
       const ix = new TransactionInstruction({
@@ -342,10 +217,10 @@
     }
   }
 
-  // Wire buttons
   el("btnConnect").addEventListener("click", connectWallet);
   el("btnMax").addEventListener("click", fillMax);
   el("btnBurn").addEventListener("click", burn);
+
 })();
 </script>
 </body>
